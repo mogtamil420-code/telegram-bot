@@ -14,15 +14,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.channel_post and update.channel_post.document:
-        doc = update.channel_post.document
-
-        files.insert_one({
-            "file_name": doc.file_name,
-            "file_id": doc.file_id
-        })
-
-        print(f"SAVED: {doc.file_name}")
+    print("UPDATE RECEIVED")
+    print(update)
 
 app = ApplicationBuilder().token(TOKEN).build()
 
