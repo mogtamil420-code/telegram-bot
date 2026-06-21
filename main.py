@@ -17,22 +17,21 @@ import os
 import uuid
 
 
-# ================= CONFIG =================
+
+# =============== CONFIG ===============
 
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URL = os.getenv("MONGO_URL")
 
-
 ADMIN_ID = 5565826679
 
-
 BOT_USERNAME = "Gezxbot"
-
 
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
-# ================= DATABASE =================
+
+# =============== DATABASE ===============
 
 
 client = MongoClient(
@@ -46,7 +45,6 @@ db = client["autofilter"]
 files = db["files"]
 
 
-
 try:
 
     client.server_info()
@@ -55,15 +53,12 @@ try:
 
 except Exception as e:
 
-    print(
-        "MongoDB Error:",
-        e
-    )
+    print("Mongo Error:", e)
 
 
 
 
-# ================= START =================
+# =============== START ===============
 
 
 async def start(
@@ -76,7 +71,7 @@ async def start(
 
 
 
-    # File delivery
+    # Send movie file
 
     if args:
 
@@ -91,19 +86,22 @@ async def start(
         )
 
 
-
         if movie:
 
 
             await context.bot.send_document(
 
+
                 chat_id=update.effective_user.id,
+
 
                 document=movie["file_id"],
 
-                caption=
-                f"🎬 {movie['file_name']}\n\n"
-                "Enjoy "
+
+                caption=f"**{movie['file_name']}**",
+
+
+                parse_mode="Markdown"
 
             )
 
@@ -113,10 +111,7 @@ async def start(
 
 
 
-    # Normal start
-
-
-    keyboard = [
+    buttons = [
 
         [
 
@@ -142,8 +137,7 @@ async def start(
         "ꜱᴇᴀʀᴄʜ ᴍᴏᴠɪᴇꜱ ɪɴ ᴏᴜʀ ᴍᴏᴠɪᴇ ꜱᴇᴀʀᴄʜ ɢʀᴏᴜᴘ.",
 
 
-        reply_markup=
-        InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(buttons)
 
     )
 
@@ -152,7 +146,7 @@ async def start(
 
 
 
-# ================= STORAGE CHANNEL =================
+# =============== STORAGE CHANNEL ===============
 
 
 async def save_file(
@@ -168,7 +162,6 @@ async def save_file(
 
 
     doc = update.channel_post.document
-
 
 
     if not doc:
@@ -200,16 +193,20 @@ async def save_file(
 
     print(
 
-        "SAVED:",
+        "Saved:",
+
         doc.file_name,
+
         movie_id
 
     )
 
 
 
-# ================= SEARCH =================
 
+
+
+# =============== SEARCH ===============
 
 
 async def search(
@@ -251,8 +248,8 @@ async def search(
 
 
 
-
     buttons = []
+
 
     count = 0
 
@@ -268,7 +265,9 @@ async def search(
         link = (
 
             f"https://t.me/"
+
             f"{BOT_USERNAME}"
+
             f"?start={movie['movie_id']}"
 
         )
@@ -281,8 +280,7 @@ async def search(
 
                 InlineKeyboardButton(
 
-                    " "
-                    + movie["file_name"][:50],
+                    f"📁 {movie['file_name'][:50]}",
 
                     url=link
 
@@ -301,9 +299,10 @@ async def search(
 
         await update.message.reply_text(
 
-            "❌ No movie found"
+            "❌ No results found"
 
         )
+
 
         return
 
@@ -313,7 +312,9 @@ async def search(
 
     await update.message.reply_text(
 
+
         f"🎬 Results for: {query}",
+
 
         reply_markup=
 
@@ -326,20 +327,22 @@ async def search(
 
 
 
-# ================= BOT =================
+
+# =============== BOT ===============
 
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 
 
-# /start
-
 app.add_handler(
 
     CommandHandler(
+
         "start",
+
         start
+
     )
 
 )
@@ -369,8 +372,7 @@ app.add_handler(
 
     MessageHandler(
 
-        filters.TEXT &
-        ~filters.COMMAND,
+        filters.TEXT & ~filters.COMMAND,
 
         search
 
@@ -380,10 +382,7 @@ app.add_handler(
 
 
 
-print(
-    "BOT STARTED 🚀"
-)
-
+print("BOT STARTED 🚀")
 
 
 app.run_polling()
