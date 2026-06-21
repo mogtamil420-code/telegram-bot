@@ -46,17 +46,13 @@ try:
     print("MongoDB Connected")
 
 except Exception as e:
-    print("MongoDB Error:", e)
+    print("Mongo Error:", e)
 
 
 
 # =============== START ===============
 
-
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
 
@@ -78,20 +74,36 @@ async def start(
         if movie:
 
 
+            caption = movie.get(
+                "caption",
+                movie["file_name"]
+            )
+
+
             await context.bot.send_document(
 
                 chat_id=update.effective_user.id,
 
                 document=movie["file_id"],
 
-                caption=f"**{movie['caption']}**",
+                caption=f"<b>{caption}</b>",
 
-                parse_mode="Markdown"
+                parse_mode="HTML"
 
             )
 
 
             return
+
+
+
+        await update.message.reply_text(
+            "❌ File not found"
+        )
+
+        return
+
+
 
 
 
@@ -112,6 +124,7 @@ async def start(
     ]
 
 
+
     await update.message.reply_text(
 
 
@@ -127,16 +140,12 @@ async def start(
 
 
 
+
+
 # =============== STORAGE CHANNEL ===============
 
 
-async def save_file(
-
-    update: Update,
-
-    context: ContextTypes.DEFAULT_TYPE
-
-):
+async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if not update.channel_post:
@@ -148,9 +157,11 @@ async def save_file(
     doc = update.channel_post.document
 
 
+
     if not doc:
 
         return
+
 
 
 
@@ -158,17 +169,17 @@ async def save_file(
 
 
 
-    # Save caption from channel
+    # EXACT caption from storage channel
 
-    caption = (
+    channel_caption = update.channel_post.caption
 
-        update.channel_post.caption
 
-        if update.channel_post.caption
 
-        else doc.file_name
+    if not channel_caption:
 
-    )
+        channel_caption = doc.file_name
+
+
 
 
 
@@ -178,11 +189,11 @@ async def save_file(
 
             "movie_id": movie_id,
 
-            "file_name": doc.file_name,
-
             "file_id": doc.file_id,
 
-            "caption": caption
+            "file_name": doc.file_name,
+
+            "caption": channel_caption
 
         }
 
@@ -192,9 +203,9 @@ async def save_file(
 
     print(
 
-        "Saved:",
+        "SAVED:",
 
-        doc.file_name,
+        channel_caption,
 
         movie_id
 
@@ -204,16 +215,12 @@ async def save_file(
 
 
 
+
+
 # =============== SEARCH ===============
 
 
-async def search(
-
-    update: Update,
-
-    context: ContextTypes.DEFAULT_TYPE
-
-):
+async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
     if not update.message:
@@ -246,9 +253,11 @@ async def search(
 
 
 
+
     buttons = []
 
     count = 0
+
 
 
 
@@ -277,7 +286,7 @@ async def search(
 
                 InlineKeyboardButton(
 
-                    f" {movie['file_name'][:50]}",
+                    f"📁 {movie['file_name'][:50]}",
 
                     url=link
 
@@ -286,6 +295,8 @@ async def search(
             ]
 
         )
+
+
 
 
 
@@ -304,13 +315,12 @@ async def search(
 
 
 
+
     await update.message.reply_text(
 
         f"🎬 Results for: {query}",
 
-        reply_markup=
-
-        InlineKeyboardMarkup(buttons)
+        reply_markup=InlineKeyboardMarkup(buttons)
 
     )
 
@@ -340,7 +350,7 @@ app.add_handler(
 
 
 
-# storage channel listener
+# Storage channel listener
 
 app.add_handler(
 
@@ -356,7 +366,7 @@ app.add_handler(
 
 
 
-# search group
+# Group search
 
 app.add_handler(
 
