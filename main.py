@@ -103,7 +103,7 @@ async def start(
 
                 caption=
                 f"🎬 {movie['file_name']}\n\n"
-                "Enjoy ❤️"
+                "Enjoy "
 
             )
 
@@ -281,7 +281,7 @@ async def search(
 
                 InlineKeyboardButton(
 
-                    "📁 "
+                    " "
                     + movie["file_name"][:50],
 
                     url=link
