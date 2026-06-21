@@ -6,14 +6,16 @@ from telegram.ext import (
 import os
 from pymongo import MongoClient
 
+# ENV
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URL = os.getenv("MONGO_URL")
 
+# DB
 client = MongoClient(MONGO_URL)
 db = client["autofilter"]
 files = db["files"]
 
-# START
+# START COMMAND
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
@@ -29,8 +31,11 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         print(f"SAVED: {doc.file_name}")
 
-# SEARCH + BUTTONS
+# GROUP SEARCH
 async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     query = update.message.text
 
     results = files.find(
@@ -44,7 +49,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         count += 1
         keyboard.append([
             InlineKeyboardButton(
-                movie["file_name"][:50],
+                movie["file_name"][:60],
                 callback_data=movie["file_id"]
             )
         ])
@@ -58,7 +63,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# BUTTON CLICK → SEND FILE
+# BUTTON CLICK HANDLER
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -70,6 +75,7 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         document=file_id
     )
 
+# APP SETUP
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -77,10 +83,10 @@ app.add_handler(CommandHandler("start", start))
 # group search
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_search))
 
-# channel save
-app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, save_file))
+# channel save (CORRECT FILTER)
+app.add_handler(MessageHandler(filters.ChatType.CHANNEL & filters.Document.ALL, save_file))
 
-# button handler
+# buttons
 app.add_handler(CallbackQueryHandler(button_click))
 
 app.run_polling()
