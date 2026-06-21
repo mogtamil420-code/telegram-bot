@@ -8,19 +8,24 @@ import os
 import uuid
 from pymongo import MongoClient
 
+# ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URL = os.getenv("MONGO_URL")
 
+ADMIN_ID = 5565826679  # ✅ YOUR ADMIN ID
+
+BOT_USERNAME = "Gezxbot"  # 🔴 CHANGE THIS
+
+# ---------------- DB ----------------
 client = MongoClient(MONGO_URL)
 db = client["autofilter"]
 files = db["files"]
 
-BOT_USERNAME = "YourBotUsername"  # 🔴 CHANGE THIS
-
-# START (DEEP LINK HANDLER)
+# ---------------- START ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
+    # Deep link handler
     if args:
         movie_id = args[0]
 
@@ -30,28 +35,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_document(
                 chat_id=update.effective_user.id,
                 document=movie["file_id"],
-                caption=f"🎬 {movie['name']}"
+                caption=f" {movie['file_name']}"
             )
             return
 
-    await update.message.reply_text("Send movie name in group.")
+    await update.message.reply_text(
+        "⚠️ Please use group to search movies."
+    )
 
-# SAVE FILE FROM CHANNEL
+# ---------------- ADMIN CHECK ----------------
+def is_admin(update: Update):
+    return update.effective_user and update.effective_user.id == ADMIN_ID
+
+# ---------------- SAVE FILE (ADMIN ONLY) ----------------
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        return
+
     if update.channel_post and update.channel_post.document:
         doc = update.channel_post.document
 
         movie_id = str(uuid.uuid4())[:8]
 
         files.insert_one({
-            "name": doc.file_name,
+            "file_name": doc.file_name,
             "file_id": doc.file_id,
             "movie_id": movie_id
         })
 
         print(f"SAVED: {doc.file_name} | {movie_id}")
 
-# GROUP SEARCH
+# ---------------- GROUP SEARCH ----------------
 async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -59,7 +73,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
 
     results = files.find(
-        {"name": {"$regex": query, "$options": "i"}}
+        {"file_name": {"$regex": query, "$options": "i"}}
     ).limit(5)
 
     keyboard = []
@@ -72,7 +86,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         keyboard.append([
             InlineKeyboardButton(
-                f"📁 {movie['name'][:50]}",
+                f" {movie['file_name'][:50]}",
                 url=link
             )
         ])
@@ -86,7 +100,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# APP
+# ---------------- APP ----------------
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
