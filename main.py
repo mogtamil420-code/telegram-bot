@@ -5,6 +5,7 @@ from telegram.ext import (
 )
 from bson import ObjectId
 import os
+import uuid
 from pymongo import MongoClient
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -14,32 +15,43 @@ client = MongoClient(MONGO_URL)
 db = client["autofilter"]
 files = db["files"]
 
-GROUP_LINK = "https://t.me/+0sWBTplLi4s3ODM9"  # 🔴 CHANGE THIS
+BOT_USERNAME = "YourBotUsername"  # 🔴 CHANGE THIS
 
-# START (PM STYLE LIKE MOVIE BOTS)
+# START (DEEP LINK HANDLER)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🎬 Movies Search Group", url=GROUP_LINK)]
-    ]
+    args = context.args
 
-    await update.message.reply_text(
-        "⚠️ ꜱᴏʀʀʏ ɪ ᴄᴀɴ'ᴛ ᴡᴏʀᴋ ɪɴ ᴘᴍ\n\n👉 ꜱᴇᴀʀᴄʜ ᴍᴏᴠɪᴇꜱ ɪɴ ᴏᴜʀ ɢʀᴏᴜᴘ.",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    if args:
+        movie_id = args[0]
+
+        movie = files.find_one({"movie_id": movie_id})
+
+        if movie:
+            await context.bot.send_document(
+                chat_id=update.effective_user.id,
+                document=movie["file_id"],
+                caption=f"🎬 {movie['name']}"
+            )
+            return
+
+    await update.message.reply_text("Send movie name in group.")
 
 # SAVE FILE FROM CHANNEL
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.channel_post and update.channel_post.document:
         doc = update.channel_post.document
 
+        movie_id = str(uuid.uuid4())[:8]
+
         files.insert_one({
-            "file_name": doc.file_name,
-            "file_id": doc.file_id
+            "name": doc.file_name,
+            "file_id": doc.file_id,
+            "movie_id": movie_id
         })
 
-        print(f"SAVED: {doc.file_name}")
+        print(f"SAVED: {doc.file_name} | {movie_id}")
 
-# GROUP SEARCH (MAIN SYSTEM)
+# GROUP SEARCH
 async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -47,7 +59,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text.strip()
 
     results = files.find(
-        {"file_name": {"$regex": query, "$options": "i"}}
+        {"name": {"$regex": query, "$options": "i"}}
     ).limit(5)
 
     keyboard = []
@@ -55,10 +67,13 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for movie in results:
         count += 1
+
+        link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
+
         keyboard.append([
             InlineKeyboardButton(
-                movie["file_name"][:60],
-                callback_data=str(movie["_id"])
+                f"📁 {movie['name'][:50]}",
+                url=link
             )
         ])
 
@@ -71,36 +86,13 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# BUTTON CLICK → SEND FILE IN PM OR GROUP
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    doc_id = query.data
-
-    movie = files.find_one({"_id": ObjectId(doc_id)})
-
-    if movie:
-        await context.bot.send_document(
-            chat_id=query.from_user.id,
-            document=movie["file_id"],
-            caption=f"🎬 {movie['file_name']}"
-        )
-    else:
-        await query.message.reply_text("File not found 😑")
-
 # APP
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 
-# group search ONLY
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_search))
 
-# channel save
 app.add_handler(MessageHandler(filters.ChatType.CHANNEL & filters.Document.ALL, save_file))
-
-# buttons
-app.add_handler(CallbackQueryHandler(button_click))
 
 app.run_polling()
