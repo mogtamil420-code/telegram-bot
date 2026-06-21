@@ -22,45 +22,67 @@ import uuid
 TOKEN = os.getenv("BOT_TOKEN")
 MONGO_URL = os.getenv("MONGO_URL")
 
+
 ADMIN_ID = 5565826679
 
+
 BOT_USERNAME = "Gezxbot"
+
 
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
 # ================= DATABASE =================
 
+
 client = MongoClient(
     MONGO_URL,
     serverSelectionTimeoutMS=5000
 )
+
 
 db = client["autofilter"]
 
 files = db["files"]
 
 
+
 try:
+
     client.server_info()
+
     print("MongoDB Connected")
+
 except Exception as e:
-    print("MongoDB Error:", e)
+
+    print(
+        "MongoDB Error:",
+        e
+    )
+
 
 
 
 # ================= START =================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
 
     args = context.args
 
 
-    # Send file from deep link
+
+    # File delivery
 
     if args:
 
+
         movie_id = args[0]
+
 
         movie = files.find_one(
             {
@@ -69,7 +91,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
         if movie:
+
 
             await context.bot.send_document(
 
@@ -79,15 +103,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 caption=
                 f"🎬 {movie['file_name']}\n\n"
-                "Enjoy your movie ❤️"
+                "Enjoy ❤️"
 
             )
+
 
             return
 
 
 
-    buttons = [
+
+    # Normal start
+
+
+    keyboard = [
 
         [
 
@@ -104,14 +133,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
 
+
     await update.message.reply_text(
+
 
         "⚠️ ꜱᴏʀʀʏ ɪ ᴄᴀɴ'ᴛ ᴡᴏʀᴋ ɪɴ ᴘᴍ\n\n"
 
         "ꜱᴇᴀʀᴄʜ ᴍᴏᴠɪᴇꜱ ɪɴ ᴏᴜʀ ᴍᴏᴠɪᴇ ꜱᴇᴀʀᴄʜ ɢʀᴏᴜᴘ.",
 
+
         reply_markup=
-        InlineKeyboardMarkup(buttons)
+        InlineKeyboardMarkup(keyboard)
 
     )
 
@@ -119,40 +151,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# ================= ADMIN UPLOAD =================
+
+# ================= STORAGE CHANNEL =================
 
 
-def is_admin(update):
-
-    return (
-        update.effective_user and
-        update.effective_user.id == ADMIN_ID
-    )
+async def save_file(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
 
-
-async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-
-    if not is_admin(update):
+    if not update.channel_post:
 
         return
 
 
 
-    if not update.message:
-
-        return
-
-
-
-    doc = update.message.document
+    doc = update.channel_post.document
 
 
 
     if not doc:
 
         return
+
 
 
 
@@ -175,29 +197,28 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-    await update.message.reply_text(
-
-        f"✅ Saved\n\n"
-        f"🎬 {doc.file_name}\n"
-        f"🔗 ID: {movie_id}"
-
-    )
-
 
     print(
-        "Saved:",
+
+        "SAVED:",
         doc.file_name,
         movie_id
+
     )
-
-
 
 
 
 # ================= SEARCH =================
 
 
-async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def search(
+
+    update: Update,
+
+    context: ContextTypes.DEFAULT_TYPE
+
+):
 
 
     if not update.message:
@@ -210,7 +231,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-    result = files.find(
+    results = files.find(
 
         {
 
@@ -230,16 +251,18 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
     buttons = []
 
     count = 0
 
 
 
-    for movie in result:
+    for movie in results:
 
 
         count += 1
+
 
 
         link = (
@@ -251,13 +274,15 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
         buttons.append(
 
             [
 
                 InlineKeyboardButton(
 
-                    f" {movie['file_name'][:45]}",
+                    "📁 "
+                    + movie["file_name"][:50],
 
                     url=link
 
@@ -270,16 +295,19 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
     if count == 0:
 
 
         await update.message.reply_text(
 
-            "❌ Movie not found"
+            "❌ No movie found"
 
         )
 
         return
+
+
 
 
 
@@ -288,6 +316,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎬 Results for: {query}",
 
         reply_markup=
+
         InlineKeyboardMarkup(buttons)
 
     )
@@ -297,12 +326,14 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-# ================= RUN =================
+# ================= BOT =================
 
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 
+
+# /start
 
 app.add_handler(
 
@@ -314,11 +345,14 @@ app.add_handler(
 )
 
 
+
+# storage channel
+
 app.add_handler(
 
     MessageHandler(
 
-        filters.Document.ALL,
+        filters.UpdateType.CHANNEL_POST,
 
         save_file
 
@@ -327,6 +361,9 @@ app.add_handler(
 )
 
 
+
+
+# group search
 
 app.add_handler(
 
@@ -343,7 +380,10 @@ app.add_handler(
 
 
 
-print("Bot Started Successfully 🚀")
+print(
+    "BOT STARTED 🚀"
+)
+
 
 
 app.run_polling()
