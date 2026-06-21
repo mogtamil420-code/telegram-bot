@@ -3,6 +3,7 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, ContextTypes,
     MessageHandler, CallbackQueryHandler, filters
 )
+from bson import ObjectId
 import os
 from pymongo import MongoClient
 
@@ -15,7 +16,7 @@ client = MongoClient(MONGO_URL)
 db = client["autofilter"]
 files = db["files"]
 
-# START COMMAND
+# START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
@@ -36,7 +37,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
-    query = update.message.text
+    query = update.message.text.strip()
 
     results = files.find(
         {"file_name": {"$regex": query, "$options": "i"}}
@@ -50,7 +51,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([
             InlineKeyboardButton(
                 movie["file_name"][:60],
-                callback_data=movie["file_id"]
+                callback_data=str(movie["_id"])
             )
         ])
 
@@ -63,19 +64,24 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# BUTTON CLICK HANDLER
+# BUTTON CLICK
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    file_id = query.data
+    doc_id = query.data
 
-    await context.bot.send_document(
-        chat_id=query.message.chat_id,
-        document=file_id
-    )
+    movie = files.find_one({"_id": ObjectId(doc_id)})
 
-# APP SETUP
+    if movie:
+        await context.bot.send_document(
+            chat_id=query.message.chat_id,
+            document=movie["file_id"]
+        )
+    else:
+        await query.message.reply_text("File not found 😢")
+
+# APP
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -83,7 +89,7 @@ app.add_handler(CommandHandler("start", start))
 # group search
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_search))
 
-# channel save (CORRECT FILTER)
+# channel save
 app.add_handler(MessageHandler(filters.ChatType.CHANNEL & filters.Document.ALL, save_file))
 
 # buttons
