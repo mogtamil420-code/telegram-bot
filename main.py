@@ -14,14 +14,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
 async def test(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    movie = files.find_one()
+    try:
+        movie = files.find_one()
+        print(movie)
 
-    if movie:
-        await update.message.reply_text(
-            f"Found: {movie['file_name']}"
-        )
-    else:
-        await update.message.reply_text("No files found")
+        if movie:
+            await update.message.reply_text(
+                f"Found: {movie['file_name']}"
+            )
+        else:
+            await update.message.reply_text("No files found")
+
+    except Exception as e:
+        print("TEST ERROR:", e)
+        await update.message.reply_text(f"Error: {e}")
 
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.channel_post and update.channel_post.document:
