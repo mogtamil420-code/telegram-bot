@@ -17,7 +17,6 @@ import os
 import uuid
 
 
-
 # =============== CONFIG ===============
 
 TOKEN = os.getenv("BOT_TOKEN")
@@ -30,15 +29,12 @@ BOT_USERNAME = "Gezxbot"
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
-
 # =============== DATABASE ===============
-
 
 client = MongoClient(
     MONGO_URL,
     serverSelectionTimeoutMS=5000
 )
-
 
 db = client["autofilter"]
 
@@ -46,15 +42,11 @@ files = db["files"]
 
 
 try:
-
     client.server_info()
-
     print("MongoDB Connected")
 
 except Exception as e:
-
-    print("Mongo Error:", e)
-
+    print("MongoDB Error:", e)
 
 
 
@@ -66,15 +58,12 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-
     args = context.args
 
 
-
-    # Send movie file
+    # Send file
 
     if args:
-
 
         movie_id = args[0]
 
@@ -91,15 +80,11 @@ async def start(
 
             await context.bot.send_document(
 
-
                 chat_id=update.effective_user.id,
-
 
                 document=movie["file_id"],
 
-
-                caption=f"**{movie['file_name']}**",
-
+                caption=f"**{movie['caption']}**",
 
                 parse_mode="Markdown"
 
@@ -107,7 +92,6 @@ async def start(
 
 
             return
-
 
 
 
@@ -128,7 +112,6 @@ async def start(
     ]
 
 
-
     await update.message.reply_text(
 
 
@@ -144,14 +127,15 @@ async def start(
 
 
 
-
-
 # =============== STORAGE CHANNEL ===============
 
 
 async def save_file(
+
     update: Update,
+
     context: ContextTypes.DEFAULT_TYPE
+
 ):
 
 
@@ -170,8 +154,21 @@ async def save_file(
 
 
 
-
     movie_id = str(uuid.uuid4())[:8]
+
+
+
+    # Save caption from channel
+
+    caption = (
+
+        update.channel_post.caption
+
+        if update.channel_post.caption
+
+        else doc.file_name
+
+    )
 
 
 
@@ -183,7 +180,9 @@ async def save_file(
 
             "file_name": doc.file_name,
 
-            "file_id": doc.file_id
+            "file_id": doc.file_id,
+
+            "caption": caption
 
         }
 
@@ -200,7 +199,6 @@ async def save_file(
         movie_id
 
     )
-
 
 
 
@@ -250,7 +248,6 @@ async def search(
 
     buttons = []
 
-
     count = 0
 
 
@@ -280,7 +277,7 @@ async def search(
 
                 InlineKeyboardButton(
 
-                    f"📁 {movie['file_name'][:50]}",
+                    f" {movie['file_name'][:50]}",
 
                     url=link
 
@@ -289,7 +286,6 @@ async def search(
             ]
 
         )
-
 
 
 
@@ -303,25 +299,20 @@ async def search(
 
         )
 
-
         return
-
 
 
 
 
     await update.message.reply_text(
 
-
         f"🎬 Results for: {query}",
-
 
         reply_markup=
 
         InlineKeyboardMarkup(buttons)
 
     )
-
 
 
 
@@ -349,7 +340,7 @@ app.add_handler(
 
 
 
-# storage channel
+# storage channel listener
 
 app.add_handler(
 
@@ -365,8 +356,7 @@ app.add_handler(
 
 
 
-
-# group search
+# search group
 
 app.add_handler(
 
