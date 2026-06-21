@@ -1,9 +1,4 @@
-from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup
-)
-
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -30,10 +25,9 @@ BOT_USERNAME = "Gezxbot"
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
-# ================= DB =================
+# ================= DATABASE =================
 
 client = MongoClient(MONGO_URL)
-
 db = client["autofilter"]
 
 files = db["files"]
@@ -54,14 +48,12 @@ if not settings.find_one({"_id": "main"}):
 # ================= UTIL =================
 
 async def save_user(update):
-    if not update.effective_user:
-        return
-
-    users.update_one(
-        {"user_id": update.effective_user.id},
-        {"$set": {"user_id": update.effective_user.id}},
-        upsert=True
-    )
+    if update.effective_user:
+        users.update_one(
+            {"user_id": update.effective_user.id},
+            {"$set": {"user_id": update.effective_user.id}},
+            upsert=True
+        )
 
 
 async def auto_delete(messages, delay):
@@ -81,6 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
 
+    # ================= FILE DELIVERY =================
     if args:
         movie_id = args[0]
 
@@ -90,16 +83,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("File not found")
             return
 
-        # file delivery
-        sent_msgs = []
+        sent = []
 
-        warn = await update.message.reply_text(
-            "⚠️ ᴀꜰᴛᴇʀ 15 minutes ᴛʜɪꜱ ᴍᴇꜱꜱᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴅᴇʟᴇᴛᴇᴅ 🗑️\n"
-            "⚠️ ɪᴍᴘᴏʀᴛᴀɴᴛ : ғᴏʀᴡᴀʀᴅ ᴛʜᴇsᴇ ᴍᴇssᴀɢᴇs ᴛᴏ sᴀᴠᴇᴅ ᴍᴇssᴀɢᴇs",
-        )
-
-        sent_msgs.append(warn)
-
+        # 1️⃣ FILE FIRST
         file_msg = await context.bot.send_document(
             chat_id=update.effective_user.id,
             document=movie["file_id"],
@@ -107,17 +93,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
-        sent_msgs.append(file_msg)
+        sent.append(file_msg)
 
-        asyncio.create_task(auto_delete(sent_msgs, 900))  # 15 min
+        # 2️⃣ WARNING SECOND
+        warn_msg = await update.message.reply_text(
+            "⚠️ ᴀꜰᴛᴇʀ 15 minutes ᴛʜɪꜱ ᴍᴇꜱꜱᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴅᴇʟᴇᴛᴇᴅ 🗑️\n"
+            "⚠️ ɪᴍᴘᴏʀᴛᴀɴᴛ : ғᴏʀᴡᴀʀᴅ ᴛᴏ sᴀᴠᴇᴅ ᴍᴇssᴀɢᴇs"
+        )
 
+        sent.append(warn_msg)
+
+        asyncio.create_task(auto_delete(sent, 900))
         return
+
+    # ================= START MENU =================
 
     data = settings.find_one({"_id": "main"})
 
-    btn = [
-        [InlineKeyboardButton(data["button_text"], url=SEARCH_GROUP)]
-    ]
+    btn = [[InlineKeyboardButton(data["button_text"], url=SEARCH_GROUP)]]
 
     await update.message.reply_text(
         data["start_text"],
@@ -139,15 +132,13 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not doc:
         return
 
-    file_id = doc.file_id
-
     movie_id = str(uuid.uuid4())[:8]
 
     caption = msg.caption if msg.caption else "No Caption"
 
     files.insert_one({
         "movie_id": movie_id,
-        "file_id": file_id,
+        "file_id": doc.file_id,
         "file_name": caption,
         "caption": caption
     })
@@ -177,13 +168,8 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
 
-        label = f"{movie['file_name'][:45]}"
-
         buttons.append([
-            InlineKeyboardButton(
-                label,
-                url=link
-            )
+            InlineKeyboardButton(movie["file_name"][:45], url=link)
         ])
 
     if count == 0:
@@ -205,7 +191,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    asyncio.create_task(auto_delete([msg], 300))  # 5 min delete
+    asyncio.create_task(auto_delete([msg], 300))
 
 
 # ================= ADMIN =================
@@ -234,17 +220,15 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
-    data = q.data
-
-    if data == "status":
+    if q.data == "status":
         total = users.count_documents({})
         await q.message.reply_text(f"Total Users: {total}")
 
-    elif data == "broadcast":
+    elif q.data == "broadcast":
         context.user_data["broadcast"] = True
         await q.message.reply_text("Send broadcast message")
 
-    elif data == "settings":
+    elif q.data == "settings":
         s = settings.find_one({"_id": "main"})
         await q.message.reply_text(
             f"Powered: {s['powered']}\n"
@@ -297,8 +281,6 @@ app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, save_file))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 
 app.add_handler(CallbackQueryHandler(callback))
-
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast))
 
 app.add_handler(MessageHandler(filters.ALL, unknown))
 
