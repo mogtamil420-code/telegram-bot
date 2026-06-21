@@ -25,7 +25,7 @@ BOT_USERNAME = "Gezxbot"
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
-# ================= DATABASE =================
+# ================= DB =================
 
 client = MongoClient(MONGO_URL)
 db = client["autofilter"]
@@ -41,7 +41,7 @@ if not settings.find_one({"_id": "main"}):
         "powered": "@Tamil_Movies_Gez",
         "note": "✓Note : Search Movies Name With Year!",
         "button_text": "Search Movies Group",
-        "start_text": "⚠️ ꜱᴏʀʀʏ ɪ ᴄᴀɴ'ᴛ ᴡᴏʀᴋ ɪɴ ᴘᴍ\n\nSearch movies in our movie search group."
+        "start_text": "⚠️ Sorry, I can't work in PM\nSearch in group."
     })
 
 
@@ -70,7 +70,6 @@ async def auto_delete(messages, delay):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await save_user(update)
-
     args = context.args
 
     # ================= FILE DELIVERY =================
@@ -83,6 +82,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("File not found")
             return
 
+        # 🔒 REQUEST LOCK SYSTEM
+        if movie.get("requested_by") != update.effective_user.id:
+            await update.message.reply_text(
+                "⚠️ ᴛʜɪꜱ ɪꜱ ɴᴏᴛ ʏᴏᴜʀ ʀᴇǫᴜᴇꜱᴛ\n"
+                "ꜱᴇᴀʀᴄʜ ʏᴏᴜʀ ᴏᴡɴ ᴍᴏᴠɪᴇ"
+            )
+            return
+
         sent = []
 
         # 1️⃣ FILE FIRST
@@ -92,21 +99,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption=f"<b>{movie['caption']}</b>",
             parse_mode="HTML"
         )
-
         sent.append(file_msg)
 
         # 2️⃣ WARNING SECOND
         warn_msg = await update.message.reply_text(
-            "⚠️ ᴀꜰᴛᴇʀ 15 minutes ᴛʜɪꜱ ᴍᴇꜱꜱᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴅᴇʟᴇᴛᴇᴅ 🗑️\n"
+            "⚠️ ᴀꜰᴛᴇʀ 15 minutes ᴛʜɪꜱ ᴍᴇꜱꜱᴀɢᴇ ᴡɪʟʟ ʙᴇ ᴅᴇʟᴇᴛᴇᴅ 🗑️\n"
             "⚠️ ɪᴍᴘᴏʀᴛᴀɴᴛ : ғᴏʀᴡᴀʀᴅ ᴛᴏ sᴀᴠᴇᴅ ᴍᴇssᴀɢᴇs"
         )
-
         sent.append(warn_msg)
 
         asyncio.create_task(auto_delete(sent, 900))
         return
-
-    # ================= START MENU =================
 
     data = settings.find_one({"_id": "main"})
 
@@ -140,7 +143,8 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "movie_id": movie_id,
         "file_id": doc.file_id,
         "file_name": caption,
-        "caption": caption
+        "caption": caption,
+        "requested_by": None   # will be set when searched
     })
 
     print("Saved:", movie_id)
@@ -156,15 +160,23 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = settings.find_one({"_id": "main"})
 
-    results = files.find({
+    results = list(files.find({
         "file_name": {"$regex": query, "$options": "i"}
-    }).limit(10)
+    }).limit(10))
 
     buttons = []
-    count = 0
+
+    if not results:
+        await update.message.reply_text("No results found")
+        return
 
     for movie in results:
-        count += 1
+
+        # 🔒 lock request to THIS user
+        files.update_one(
+            {"movie_id": movie["movie_id"]},
+            {"$set": {"requested_by": update.effective_user.id}}
+        )
 
         link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
 
@@ -172,16 +184,12 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton(movie["file_name"][:45], url=link)
         ])
 
-    if count == 0:
-        await update.message.reply_text("No results found")
-        return
-
     mention = update.effective_user.mention_html()
 
     text = (
         f"Tʜᴇ Rᴇꜱᴜʟᴛꜱ Fᴏʀ ☞ {query}\n\n"
-        f"Rᴇǫᴜᴇsᴛᴇᴅ Bʏ ☞ : {mention}\n\n"
-        f"ᴘᴏᴡᴇʀᴇᴅ ʙʏ ☞ : {data['powered']}\n\n"
+        f"Rᴇǫᴜᴇsᴛᴇᴅ Bʏ ☞ {mention}\n\n"
+        f"ᴘᴏᴡᴇʀᴇᴅ ʙʏ ☞ {data['powered']}\n\n"
         f"{data['note']}"
     )
 
@@ -263,12 +271,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Sent to {sent} users")
 
 
-# ================= UNKNOWN =================
-
-async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Use /start command")
-
-
 # ================= APP =================
 
 app = ApplicationBuilder().token(TOKEN).build()
@@ -281,8 +283,6 @@ app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, save_file))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 
 app.add_handler(CallbackQueryHandler(callback))
-
-app.add_handler(MessageHandler(filters.ALL, unknown))
 
 print("BOT STARTED 🚀")
 app.run_polling()
