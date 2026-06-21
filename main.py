@@ -16,7 +16,7 @@ client = MongoClient(MONGO_URL)
 db = client["autofilter"]
 files = db["files"]
 
-# START
+# START COMMAND
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
@@ -56,7 +56,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
     if count == 0:
-        await update.message.reply_text("No results found 😢")
+        await update.message.reply_text("No results found 😑")
         return
 
     await update.message.reply_text(
@@ -64,7 +64,7 @@ async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# BUTTON CLICK
+# BUTTON CLICK → SEND TO PM
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -75,13 +75,14 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if movie:
         await context.bot.send_document(
-            chat_id=query.message.chat_id,
-            document=movie["file_id"]
+            chat_id=query.from_user.id,   # 👈 PM ONLY
+            document=movie["file_id"],
+            caption=f"🎬 {movie['file_name']}"
         )
     else:
-        await query.message.reply_text("File not found 😢")
+        await query.message.reply_text("File not found 😑")
 
-# APP
+# APP SETUP
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -92,7 +93,7 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_search))
 # channel save
 app.add_handler(MessageHandler(filters.ChatType.CHANNEL & filters.Document.ALL, save_file))
 
-# buttons
+# button handler
 app.add_handler(CallbackQueryHandler(button_click))
 
 app.run_polling()
