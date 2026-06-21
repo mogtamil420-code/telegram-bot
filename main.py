@@ -14,21 +14,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot is running 🚀")
 
 async def test(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        movie = files.find_one()
-        print(movie)
+    movie = files.find_one()
 
-        if movie:
-            await update.message.reply_text(
-                f"Found: {movie['file_name']}"
-            )
-        else:
-            await update.message.reply_text("No files found")
+    if movie:
+        await update.message.reply_text(f"Found: {movie['file_name']}")
+    else:
+        await update.message.reply_text("No files found")
 
-    except Exception as e:
-        print("TEST ERROR:", e)
-        await update.message.reply_text(f"Error: {e}")
-
+# SAVE FILES FROM CHANNEL ONLY
 async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.channel_post and update.channel_post.document:
         doc = update.channel_post.document
@@ -41,10 +34,28 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         print(f"SAVED: {doc.file_name}")
 
+# GROUP SEARCH HANDLER (IMPORTANT)
+async def group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.message.text
+
+    result = files.find_one({"file_name": {"$regex": query, "$options": "i"}})
+
+    if result:
+        await update.message.reply_text(
+            f"🎬 Search Result:\n\n📁 {result['file_name']}"
+        )
+    else:
+        await update.message.reply_text("No results found 😢")
+
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("test", test))
-app.add_handler(MessageHandler(filters.ALL, save_file))
+
+# group messages → search
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, group_search))
+
+# channel posts → save files
+app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, save_file))
 
 app.run_polling()
