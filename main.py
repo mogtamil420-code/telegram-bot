@@ -9,6 +9,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     ContextTypes,
+    CallbackQueryHandler,
     filters
 )
 
@@ -29,80 +30,182 @@ BOT_USERNAME = "Gezxbot"
 SEARCH_GROUP = "https://t.me/+0sWBTplLi4s3ODM9"
 
 
+
 # =============== DATABASE ===============
+
 
 client = MongoClient(
     MONGO_URL,
     serverSelectionTimeoutMS=5000
 )
 
+
 db = client["autofilter"]
+
 
 files = db["files"]
 
+users = db["users"]
+
+
 
 try:
+
     client.server_info()
+
     print("MongoDB Connected")
 
 except Exception as e:
+
     print("Mongo Error:", e)
+
+
+
+
+# =============== SAVE USERS ===============
+
+
+async def save_user(update):
+
+    if not update.effective_user:
+
+        return
+
+
+    users.update_one(
+
+        {
+            "user_id":
+            update.effective_user.id
+        },
+
+        {
+            "$set":
+            {
+                "user_id":
+                update.effective_user.id
+            }
+        },
+
+        upsert=True
+
+    )
+
+
 
 
 
 # =============== START ===============
 
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+    await save_user(update)
+
+
+
+    # ADMIN PANEL
+
+
+    if update.effective_user.id == ADMIN_ID:
+
+
+        buttons = [
+
+            [
+
+                InlineKeyboardButton(
+                    "📊 Status",
+                    callback_data="status"
+                )
+
+            ],
+
+            [
+
+                InlineKeyboardButton(
+                    "📢 Broadcast",
+                    callback_data="broadcast"
+                )
+
+            ]
+
+        ]
+
+
+
+        await update.message.reply_text(
+
+            "👑 Welcome Admin",
+
+            reply_markup=
+            InlineKeyboardMarkup(buttons)
+
+        )
+
+        return
+
+
+
 
     args = context.args
 
 
-    # Send file
+
+    # SEND FILE
+
 
     if args:
+
 
         movie_id = args[0]
 
 
+
         movie = files.find_one(
+
             {
-                "movie_id": movie_id
+                "movie_id":
+                movie_id
             }
+
         )
+
 
 
         if movie:
 
 
+
             caption = movie.get(
+
                 "caption",
+
                 movie["file_name"]
+
             )
+
 
 
             await context.bot.send_document(
 
-                chat_id=update.effective_user.id,
+                chat_id=
+                update.effective_user.id,
 
-                document=movie["file_id"],
+                document=
+                movie["file_id"],
 
-                caption=f"<b>{caption}</b>",
+                caption=
+                f"<b>{caption}</b>",
 
-                parse_mode="HTML"
+                parse_mode=
+                "HTML"
 
             )
 
 
             return
-
-
-
-        await update.message.reply_text(
-            "❌ File not found"
-        )
-
-        return
-
 
 
 
@@ -127,13 +230,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
 
-
         "⚠️ ꜱᴏʀʀʏ ɪ ᴄᴀɴ'ᴛ ᴡᴏʀᴋ ɪɴ ᴘᴍ\n\n"
 
         "ꜱᴇᴀʀᴄʜ ᴍᴏᴠɪᴇꜱ ɪɴ ᴏᴜʀ ᴍᴏᴠɪᴇ ꜱᴇᴀʀᴄʜ ɢʀᴏᴜᴘ.",
 
-
-        reply_markup=InlineKeyboardMarkup(buttons)
+        reply_markup=
+        InlineKeyboardMarkup(buttons)
 
     )
 
@@ -169,17 +271,15 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-    # EXACT caption from storage channel
+    caption = (
 
-    channel_caption = update.channel_post.caption
+        update.channel_post.caption
 
+        if update.channel_post.caption
 
+        else doc.file_name
 
-    if not channel_caption:
-
-        channel_caption = doc.file_name
-
-
+    )
 
 
 
@@ -187,13 +287,17 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         {
 
-            "movie_id": movie_id,
+            "movie_id":
+            movie_id,
 
-            "file_id": doc.file_id,
+            "file_id":
+            doc.file_id,
 
-            "file_name": doc.file_name,
+            "file_name":
+            doc.file_name,
 
-            "caption": channel_caption
+            "caption":
+            caption
 
         }
 
@@ -203,11 +307,8 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     print(
 
-        "SAVED:",
-
-        channel_caption,
-
-        movie_id
+        "Saved:",
+        caption
 
     )
 
@@ -223,9 +324,7 @@ async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
-    if not update.message:
-
-        return
+    await save_user(update)
 
 
 
@@ -241,9 +340,11 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             {
 
-                "$regex": query,
+                "$regex":
+                query,
 
-                "$options": "i"
+                "$options":
+                "i"
 
             }
 
@@ -253,11 +354,10 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
     buttons = []
 
-    count = 0
 
+    count = 0
 
 
 
@@ -286,7 +386,8 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 InlineKeyboardButton(
 
-                    f"📁 {movie['file_name'][:50]}",
+                    "📁 "
+                    + movie["file_name"][:50],
 
                     url=link
 
@@ -315,14 +416,146 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
     await update.message.reply_text(
 
         f"🎬 Results for: {query}",
 
-        reply_markup=InlineKeyboardMarkup(buttons)
+        reply_markup=
+        InlineKeyboardMarkup(buttons)
 
     )
+
+
+
+
+
+
+# =============== ADMIN BUTTONS ===============
+
+
+async def admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+    query = update.callback_query
+
+
+    await query.answer()
+
+
+
+    if query.data == "status":
+
+
+        total = users.count_documents({})
+
+
+        await query.message.reply_text(
+
+            f"📊 Total Users: {total}"
+
+        )
+
+
+
+
+    elif query.data == "broadcast":
+
+
+        context.user_data["broadcast"] = True
+
+
+
+        await query.message.reply_text(
+
+            "📢 Send message to broadcast"
+
+        )
+
+
+
+
+
+
+
+# =============== BROADCAST ===============
+
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+    if update.effective_user.id != ADMIN_ID:
+
+        return
+
+
+
+    if context.user_data.get("broadcast"):
+
+
+        msg = update.message.text
+
+
+
+        sent = 0
+
+
+
+        for user in users.find():
+
+            try:
+
+
+                await context.bot.send_message(
+
+                    user["user_id"],
+
+                    msg
+
+                )
+
+
+                sent += 1
+
+
+            except:
+
+                pass
+
+
+
+
+        context.user_data["broadcast"] = False
+
+
+
+        await update.message.reply_text(
+
+            f"✅ Broadcast sent to {sent} users"
+
+        )
+
+
+
+
+
+
+
+
+# =============== UNKNOWN MESSAGE ===============
+
+
+async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+    await save_user(update)
+
+
+    await update.message.reply_text(
+
+        "⚠️ Please use /start command"
+
+    )
+
 
 
 
@@ -350,8 +583,6 @@ app.add_handler(
 
 
 
-# Storage channel listener
-
 app.add_handler(
 
     MessageHandler(
@@ -366,8 +597,6 @@ app.add_handler(
 
 
 
-# Group search
-
 app.add_handler(
 
     MessageHandler(
@@ -375,6 +604,46 @@ app.add_handler(
         filters.TEXT & ~filters.COMMAND,
 
         search
+
+    )
+
+)
+
+
+
+app.add_handler(
+
+    CallbackQueryHandler(
+
+        admin_buttons
+
+    )
+
+)
+
+
+
+app.add_handler(
+
+    MessageHandler(
+
+        filters.TEXT,
+
+        broadcast
+
+    )
+
+)
+
+
+
+app.add_handler(
+
+    MessageHandler(
+
+        filters.ALL,
+
+        unknown
 
     )
 
