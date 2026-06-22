@@ -1,8 +1,17 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
+
 from pymongo import MongoClient
 import os
-from collections import defaultdict
+import uuid
+import asyncio
 
 
 # ================= CONFIG =================
@@ -13,7 +22,9 @@ MONGO_URL = os.getenv("MONGO_URL")
 ADMIN_ID = 5565826679
 BOT_USERNAME = "Gezxbot"
 
-FORCE_CHANNEL = "https://t.me/+SZWfXlte9ddkMTJl"
+# ✅ YOUR CHANNEL ID (FIXED)
+FORCE_CHANNEL_ID = -1003791438228
+FORCE_CHANNEL_LINK = "https://t.me/+SZWfXlte9ddkMTJl"
 
 
 # ================= DB =================
@@ -25,12 +36,7 @@ files = db["files"]
 users = db["users"]
 
 
-# ================= MEMORY STORE (IMPORTANT FIX) =================
-
-pending_requests = {}   # user_id -> movie_id
-
-
-# ================= UTIL =================
+# ================= USER SAVE =================
 
 async def save_user(update):
     if update.effective_user:
@@ -41,62 +47,30 @@ async def save_user(update):
         )
 
 
-# ================= FORCE JOIN CHECK =================
+# ================= FORCE JOIN CHECK (FIXED 100%) =================
 
 async def is_joined(update, context):
 
+    user_id = update.effective_user.id
+
     try:
         member = await context.bot.get_chat_member(
-            chat_id="@SZWfXlte9ddkMTJl",
-            user_id=update.effective_user.id
+            chat_id=FORCE_CHANNEL_ID,
+            user_id=user_id
         )
 
-        return member.status not in ["left", "kicked"]
+        # important fix
+        if member.status in ["left", "kicked"]:
+            return False
 
-    except:
+        return True
+
+    except Exception as e:
+        print("JOIN ERROR:", e)
         return False
 
 
-# ================= START =================
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await save_user(update)
-
-    args = context.args
-
-    user_id = update.effective_user.id
-
-    # ================= FILE REQUEST FLOW =================
-    if args:
-
-        movie_id = args[0]
-
-        # SAVE REQUEST (IMPORTANT FIX)
-        pending_requests[user_id] = movie_id
-
-        # FORCE JOIN CHECK
-        if not await is_joined(update, context):
-
-            btn = [
-                [InlineKeyboardButton("Jᴏɪɴ", url=FORCE_CHANNEL)],
-                [InlineKeyboardButton("Tʀʏ ᴀɢᴀɪɴ", callback_data="retry")]
-            ]
-
-            await update.message.reply_text(
-                "⚠️ Yᴏᴜ ᴍᴜsᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴄᴏᴜɴᴛɪɴᴜᴇ",
-                reply_markup=InlineKeyboardMarkup(btn)
-            )
-            return
-
-        # if already joined → send file
-        return await send_file(update, context, movie_id)
-
-    # normal start
-    await update.message.reply_text("🎬 Welcome! Search movies in group")
-
-
-# ================= SEND FILE FUNCTION =================
+# ================= SEND FILE =================
 
 async def send_file(update, context, movie_id):
 
@@ -114,32 +88,39 @@ async def send_file(update, context, movie_id):
     )
 
 
-# ================= CALLBACK =================
+# ================= START =================
 
-async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    q = update.callback_query
-    await q.answer()
+    await save_user(update)
 
-    user_id = q.from_user.id
+    args = context.args
+    user_id = update.effective_user.id
 
-    if q.data == "retry":
+    # ================= FILE REQUEST =================
+    if args:
 
-        # GET STORED REQUEST (IMPORTANT FIX)
-        movie_id = pending_requests.get(user_id)
+        movie_id = args[0]
 
-        if not movie_id:
-            await q.message.reply_text("No request found. Use /start again")
+        # FORCE JOIN CHECK
+        if not await is_joined(update, context):
+
+            btn = [
+                [InlineKeyboardButton("Jᴏɪɴ", url=FORCE_CHANNEL_LINK)],
+                [InlineKeyboardButton("Tʀʏ ᴀɢᴀɪɴ", callback_data=f"check_{movie_id}")]
+            ]
+
+            await update.message.reply_text(
+                "⚠️ Yᴏᴜ ᴍᴜsᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴄᴏᴜɴᴛɪɴᴜᴇ",
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
             return
 
-        if await is_joined(update, context):
+        # if joined → send file
+        await send_file(update, context, movie_id)
+        return
 
-            await send_file(update, context, movie_id)
-
-        else:
-
-            await q.message.reply_text("Still not joined channel")
-
+    await update.message.reply_text("🎬 Welcome! Search movies in group")
 
 
 # ================= SEARCH =================
@@ -165,9 +146,37 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
     await update.message.reply_text(
-        "Results:",
+        "🎬 Results:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
+
+
+# ================= CALLBACK (FIXED JOIN AFTER CLICK) =================
+
+async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    q = update.callback_query
+    await q.answer()
+
+    data = q.data
+    user_id = q.from_user.id
+
+    if data.startswith("check_"):
+
+        movie_id = data.split("_")[1]
+
+        # small delay fix (Telegram update delay)
+        await asyncio.sleep(2)
+
+        if await is_joined(update, context):
+
+            await send_file(update, context, movie_id)
+
+        else:
+
+            await q.message.reply_text(
+                "❌ Sᴛɪʟʟ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴄʜᴀɴɴᴇʟ.\nPlease join and try again."
+            )
 
 
 # ================= APP =================
@@ -178,5 +187,5 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 app.add_handler(CallbackQueryHandler(callback))
 
-print("BOT FIXED 🚀")
+print("BOT STARTED SUCCESSFULLY 🚀")
 app.run_polling()
