@@ -1,18 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters
-)
-
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from pymongo import MongoClient
 import os
-import uuid
-import asyncio
-from collections import OrderedDict
+from collections import defaultdict
 
 
 # ================= CONFIG =================
@@ -35,22 +25,9 @@ files = db["files"]
 users = db["users"]
 
 
-# ================= FAST CACHE (FIX RAILWAY CRASH) =================
+# ================= MEMORY STORE (IMPORTANT FIX) =================
 
-cache = OrderedDict()
-CACHE_LIMIT = 50
-
-
-def set_cache(key, value):
-    if key in cache:
-        cache.move_to_end(key)
-    cache[key] = value
-    if len(cache) > CACHE_LIMIT:
-        cache.popitem(last=False)
-
-
-def get_cache(key):
-    return cache.get(key)
+pending_requests = {}   # user_id -> movie_id
 
 
 # ================= UTIL =================
@@ -64,24 +41,20 @@ async def save_user(update):
         )
 
 
-# ================= FORCE JOIN =================
+# ================= FORCE JOIN CHECK =================
 
-async def check_join(update, context):
-    user = update.effective_user.id
+async def is_joined(update, context):
 
     try:
         member = await context.bot.get_chat_member(
             chat_id="@SZWfXlte9ddkMTJl",
-            user_id=user
+            user_id=update.effective_user.id
         )
 
-        if member.status in ["left", "kicked"]:
-            return False
+        return member.status not in ["left", "kicked"]
 
     except:
         return False
-
-    return True
 
 
 # ================= START =================
@@ -90,51 +63,83 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await save_user(update)
 
-    # FORCE JOIN CHECK
-    if not await check_join(update, context):
-
-        btn = [
-            [InlineKeyboardButton("Join Channel", url=FORCE_CHANNEL)],
-            [InlineKeyboardButton("Try Again", callback_data="retry")]
-        ]
-
-        await update.message.reply_text(
-            "⚠️ You must join our channel to use this bot",
-            reply_markup=InlineKeyboardMarkup(btn)
-        )
-        return
-
     args = context.args
 
+    user_id = update.effective_user.id
+
+    # ================= FILE REQUEST FLOW =================
     if args:
+
         movie_id = args[0]
 
-        movie = files.find_one({"movie_id": movie_id})
+        # SAVE REQUEST (IMPORTANT FIX)
+        pending_requests[user_id] = movie_id
 
-        if not movie:
-            await update.message.reply_text("File not found")
+        # FORCE JOIN CHECK
+        if not await is_joined(update, context):
+
+            btn = [
+                [InlineKeyboardButton("Jᴏɪɴ", url=FORCE_CHANNEL)],
+                [InlineKeyboardButton("Tʀʏ ᴀɢᴀɪɴ", callback_data="retry")]
+            ]
+
+            await update.message.reply_text(
+                "⚠️ Yᴏᴜ ᴍᴜsᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴄᴏᴜɴᴛɪɴᴜᴇ",
+                reply_markup=InlineKeyboardMarkup(btn)
+            )
             return
 
-        # cache check
-        cached = get_cache(movie_id)
-        if cached:
-            file_id = cached
-        else:
-            file_id = movie["file_id"]
-            set_cache(movie_id, file_id)
+        # if already joined → send file
+        return await send_file(update, context, movie_id)
 
-        await context.bot.send_document(
-            chat_id=update.effective_user.id,
-            document=file_id,
-            caption=f"<b>{movie['caption']}</b>",
-            parse_mode="HTML"
-        )
+    # normal start
+    await update.message.reply_text("🎬 Welcome! Search movies in group")
 
+
+# ================= SEND FILE FUNCTION =================
+
+async def send_file(update, context, movie_id):
+
+    movie = files.find_one({"movie_id": movie_id})
+
+    if not movie:
+        await update.message.reply_text("File not found")
         return
 
-    await update.message.reply_text(
-        "🎬 Welcome to Movie Bot\nSearch in group to get movies"
+    await context.bot.send_document(
+        chat_id=update.effective_user.id,
+        document=movie["file_id"],
+        caption=f"<b>{movie['caption']}</b>",
+        parse_mode="HTML"
     )
+
+
+# ================= CALLBACK =================
+
+async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    q = update.callback_query
+    await q.answer()
+
+    user_id = q.from_user.id
+
+    if q.data == "retry":
+
+        # GET STORED REQUEST (IMPORTANT FIX)
+        movie_id = pending_requests.get(user_id)
+
+        if not movie_id:
+            await q.message.reply_text("No request found. Use /start again")
+            return
+
+        if await is_joined(update, context):
+
+            await send_file(update, context, movie_id)
+
+        else:
+
+            await q.message.reply_text("Still not joined channel")
+
 
 
 # ================= SEARCH =================
@@ -143,21 +148,11 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await save_user(update)
 
-    query = update.message.text.strip().lower()
+    query = update.message.text
 
-    cached = get_cache(query)
-
-    if cached:
-        results = cached
-    else:
-        results = list(files.find({
-            "file_name": {"$regex": query, "$options": "i"}
-        }).limit(10))
-        set_cache(query, results)
-
-    if not results:
-        await update.message.reply_text("No results found")
-        return
+    results = files.find({
+        "file_name": {"$regex": query, "$options": "i"}
+    }).limit(10)
 
     buttons = []
 
@@ -170,52 +165,9 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
     await update.message.reply_text(
-        f"Results for: {query}",
+        "Results:",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
-
-
-# ================= ADMIN DASHBOARD =================
-
-async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if update.effective_user.id != ADMIN_ID:
-        return
-
-    total_users = users.count_documents({})
-    total_files = files.count_documents({})
-
-    btn = [
-        [InlineKeyboardButton("Broadcast", callback_data="broadcast")],
-        [InlineKeyboardButton("Refresh Stats", callback_data="stats")]
-    ]
-
-    await update.message.reply_text(
-        f" ADMIN DASHBOARD\n\n"
-        f" Users: {total_users}\n"
-        f" Files: {total_files}\n"
-        f" Cache size: {len(cache)}",
-        reply_markup=InlineKeyboardMarkup(btn)
-    )
-
-
-# ================= CALLBACK =================
-
-async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    q = update.callback_query
-    await q.answer()
-
-    if q.data == "retry":
-        await q.message.reply_text("Try /start again")
-
-    elif q.data == "stats":
-        total_users = users.count_documents({})
-        total_files = files.count_documents({})
-
-        await q.message.reply_text(
-            f"📊 LIVE STATS\nUsers: {total_users}\nFiles: {total_files}"
-        )
 
 
 # ================= APP =================
@@ -223,10 +175,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("admin", admin))
-
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 app.add_handler(CallbackQueryHandler(callback))
 
-print("BOT RUNNING SAFE VERSION 🚀")
+print("BOT FIXED 🚀")
 app.run_polling()
