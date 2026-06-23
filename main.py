@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -8,32 +8,11 @@ from telegram.ext import (
     filters
 )
 
-from pymongo import MongoClient
-import os
-import uuid
+from config import *
+from database import *
+
 import asyncio
-
-
-# ================= CONFIG =================
-
-TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URL = os.getenv("MONGO_URL")
-
-ADMIN_ID = 5565826679
-BOT_USERNAME = "Gezxbot"
-
-# ✅ YOUR CHANNEL ID (FIXED)
-FORCE_CHANNEL_ID = -1003791438228
-FORCE_CHANNEL_LINK = "https://t.me/+SZWfXlte9ddkMTJl"
-
-
-# ================= DB =================
-
-client = MongoClient(MONGO_URL)
-db = client["autofilter"]
-
-files = db["files"]
-users = db["users"]
+import uuid
 
 
 # ================= USER SAVE =================
@@ -47,33 +26,22 @@ async def save_user(update):
         )
 
 
-# ================= FORCE JOIN CHECK (FIXED 100%) =================
+# ================= FORCE JOIN CHECK =================
 
 async def is_joined(update, context):
-
-    user_id = update.effective_user.id
-
     try:
         member = await context.bot.get_chat_member(
-            chat_id=FORCE_CHANNEL_ID,
-            user_id=user_id
+            FORCE_CHANNEL_ID,
+            update.effective_user.id
         )
-
-        # important fix
-        if member.status in ["left", "kicked"]:
-            return False
-
-        return True
-
-    except Exception as e:
-        print("JOIN ERROR:", e)
+        return member.status not in ["left", "kicked"]
+    except:
         return False
 
 
 # ================= SEND FILE =================
 
 async def send_file(update, context, movie_id):
-
     movie = files.find_one({"movie_id": movie_id})
 
     if not movie:
@@ -94,33 +62,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await save_user(update)
 
-    args = context.args
-    user_id = update.effective_user.id
+    if context.args:
 
-    # ================= FILE REQUEST =================
-    if args:
+        movie_id = context.args[0]
 
-        movie_id = args[0]
-
-        # FORCE JOIN CHECK
         if not await is_joined(update, context):
 
-            btn = [
-                [InlineKeyboardButton("Jᴏɪɴ", url=FORCE_CHANNEL_LINK)],
-                [InlineKeyboardButton("Tʀʏ ᴀɢᴀɪɴ", callback_data=f"check_{movie_id}")]
-            ]
-
             await update.message.reply_text(
-                "⚠️ Yᴏᴜ ᴍᴜsᴛ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴛᴏ ᴄᴏᴜɴᴛɪɴᴜᴇ",
-                reply_markup=InlineKeyboardMarkup(btn)
+                "⚠️ Join channel first!",
             )
             return
 
-        # if joined → send file
         await send_file(update, context, movie_id)
         return
 
-    await update.message.reply_text("🎬 Welcome! Search movies in group")
+    await update.message.reply_text(
+        "Welcome to Movie Bot"
+    )
 
 
 # ================= SEARCH =================
@@ -135,48 +93,43 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "file_name": {"$regex": query, "$options": "i"}
     }).limit(10)
 
-    buttons = []
-
     for movie in results:
 
         link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
 
-        buttons.append([
-            InlineKeyboardButton(movie["file_name"][:45], url=link)
-        ])
-
-    await update.message.reply_text(
-        "🎬 Results:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
+        await update.message.reply_text(
+            f"{movie['file_name']}\n{movie.get('size','')}\n{link}"
+        )
 
 
-# ================= CALLBACK (FIXED JOIN AFTER CLICK) =================
+# ================= STORAGE CHANNEL SAVE =================
+
+async def save_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.channel_post:
+        return
+
+    doc = update.channel_post.document
+    if not doc:
+        return
+
+    movie_id = str(uuid.uuid4())[:8]
+
+    files.insert_one({
+        "movie_id": movie_id,
+        "file_id": doc.file_id,
+        "file_name": doc.file_name,
+        "caption": update.channel_post.caption or doc.file_name,
+        "size": doc.file_size
+    })
+
+    print("Saved:", doc.file_name)
+
+
+# ================= CALLBACK (EMPTY FOR NOW) =================
 
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    q = update.callback_query
-    await q.answer()
-
-    data = q.data
-    user_id = q.from_user.id
-
-    if data.startswith("check_"):
-
-        movie_id = data.split("_")[1]
-
-        # small delay fix (Telegram update delay)
-        await asyncio.sleep(2)
-
-        if await is_joined(update, context):
-
-            await send_file(update, context, movie_id)
-
-        else:
-
-            await q.message.reply_text(
-                "❌ Sᴛɪʟʟ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴄʜᴀɴɴᴇʟ.\nPlease join and try again."
-            )
+    await update.callback_query.answer()
 
 
 # ================= APP =================
@@ -185,7 +138,8 @@ app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
+app.add_handler(MessageHandler(filters.UpdateType.CHANNEL_POST, save_file))
 app.add_handler(CallbackQueryHandler(callback))
 
-print("BOT STARTED SUCCESSFULLY 🚀")
+print("BOT STARTED 🚀")
 app.run_polling()
