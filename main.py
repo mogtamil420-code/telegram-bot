@@ -24,7 +24,7 @@ async def save_user(update):
             {"$set": {"user_id": update.effective_user.id}},
             upsert=True
         )
-=============== FORCE JOIN =================
+# =============== FORCE JOIN =================
 
 async def is_joined(update, context):
     try:
