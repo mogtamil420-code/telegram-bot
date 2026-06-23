@@ -60,7 +60,7 @@ async def send_file(update, context, movie_id):
 # ================= START =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+    await start_menu(update, context)
     await save_user(update)
 
     user = update.effective_user
