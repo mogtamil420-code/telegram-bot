@@ -356,7 +356,8 @@ app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(CallbackQueryHandler(admin_callback))
 
 print("BOT STARTED 🚀")
-app.run_polling()￼Enter NORMAL START → START MENU
+app.run_polling()
+    async def start(update, context):
     await start_menu(update, context)
 
 
