@@ -357,31 +357,3 @@ app.add_handler(CallbackQueryHandler(admin_callback))
 
 print("BOT STARTED 🚀")
 app.run_polling()
-    async def start(update, context):
-    await start_menu(update, context)
-
-
-# ================= SEARCH =================
-
-async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await save_user(update)
-
-    query = update.message.text
-
-    results = files.find({
-        "file_name": {"$regex": query, "$options": "i"}
-    }).limit(10)
-
-    buttons = []
-
-    for movie in results:
-
-        link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
-
-        buttons.append([
-            InlineKeyboardButton(
-                f"{movie['file_name'][:45]}",
-                url=link
-            )
-        ])
