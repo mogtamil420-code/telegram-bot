@@ -225,5 +225,6 @@ app.add_handler(CallbackQueryHandler(admin_callback))
 
 # ONLY ONE TEXT HANDLER
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
+
 print("BOT STARTED 🚀")
 app.run_polling()
