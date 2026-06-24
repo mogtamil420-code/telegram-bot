@@ -109,7 +109,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.message.text
     
     if len(query) < 3:
-    return
+        return
 
     results = files.find({
         "file_name": {"$regex": query, "$options": "i"}
