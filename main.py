@@ -63,12 +63,9 @@ async def send_file(update, context, movie_id):
 async def auto_delete(context, chat_id, message_id, seconds=900):
     await asyncio.sleep(seconds)
     try:
-        await context.bot.delete_message(
-            chat_id=chat_id,
-            message_id=message_id
-        )
+        await context.bot.delete_message(chat_id, message_id)
     except Exception as e:
-        print("AUTO DELETE ERROR:", e)
+        print("Auto delete error:", e)
 
 # ================= START =================
 
@@ -96,6 +93,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await start_menu(update, context)
+
+app.add_handler(CommandHandler("admin", admin))
+app.add_handler(CallbackQueryHandler(admin_callback))
 
 
 # ================= SEARCH =================
@@ -169,7 +169,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 app.add_handler(CallbackQueryHandler(callback))
 
 if __name__ == "__main__":
