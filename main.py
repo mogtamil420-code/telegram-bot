@@ -98,29 +98,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # START MENU
     await start_menu(update, context)
+    return
 
 
 # ================= SEARCH =================
-async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await save_user(update)
+async def search(update, context):
 
-    query = update.message.text
+    # Only work in groups
+    if update.effective_chat.type == "private":
 
-    results = files.find({
-        "file_name": {"$regex": query, "$options": "i"}
-    }).limit(10)
+        buttons = [[
+            InlineKeyboardButton(
+                "Jᴏɪɴ Gʀᴏᴜᴘ",
+                url=SEARCH_GROUP_LINK
+            )
+        ]]
 
-    buttons = []
-
-    for movie in results:
-        link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
-
-        buttons.append([
-            InlineKeyboardButton(movie["file_name"][:45], url=link)
-        ])
-
-    if not buttons:
-        await update.message.reply_text("❌ Rᴇsᴜʟᴛs ɴᴏᴛ ғᴏᴜɴᴅ")
+        await update.message.reply_text(
+            "Sᴏʀʀʏ Dᴜᴅᴇ!\n\n"
+            "I Cᴀɴ'ᴛ Wᴏʀᴋ Hᴇʀᴇ, Jᴜsᴛ Jᴏɪɴ ɪɴ ᴏᴜʀ Gʀᴏᴜᴘ Aɴᴅ Eɴᴊᴏʏ",
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
         return
 
     msg = await update.message.reply_text(
