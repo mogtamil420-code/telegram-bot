@@ -1,13 +1,9 @@
-import asyncio
-
-async def auto_delete(bot, chat_id, message_id, seconds=300):
-
+async def auto_delete(context, chat_id, message_id, seconds=900):
     await asyncio.sleep(seconds)
-
     try:
-        await bot.delete_message(
+        await context.bot.delete_message(
             chat_id=chat_id,
             message_id=message_id
         )
-    except:
-        pass
+    except Exception as e:
+        print("AUTO DELETE ERROR:", e)
