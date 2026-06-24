@@ -190,6 +190,20 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await q.message.delete()
 
+elif data == "help":
+
+    await q.message.reply_text(
+        " Search movie name in group.\n"
+        " Click result button.\n"
+        " Bot sends file in PM."
+    )
+
+elif data == "about":
+
+    await q.message.reply_text(
+        f"🤖 {BOT_USERNAME}\n"
+        "Auto Filter Bot"
+    )
 
 # ================= ADMIN =================
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
