@@ -251,7 +251,6 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================= APP =================
-
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
@@ -271,6 +270,5 @@ app.add_handler(
 app.add_handler(
     CallbackQueryHandler(callback)
 )
-
 print("BOT STARTED 🚀")
 app.run_polling()
