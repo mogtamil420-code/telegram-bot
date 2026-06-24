@@ -24,10 +24,8 @@ async def start_menu(update, context):
         ]
     ]
 
-    await context.bot.send_photo(
-        chat_id=update.effective_chat.id,
-        photo=START_IMAGE,
-        caption=text,
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await update.message.reply_text(
+    text,
+    parse_mode="HTML",
+    reply_markup=InlineKeyboardMarkup(keyboard)
+)
