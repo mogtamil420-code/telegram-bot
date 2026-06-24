@@ -1,7 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from config import START_IMAGE, SEARCH_GROUP_LINK
 
-
 async def start_menu(update, context):
 
     user = update.effective_user
@@ -14,26 +13,14 @@ async def start_menu(update, context):
 
     keyboard = [
         [
-            InlineKeyboardButton(
-                "Hᴇʟᴘ",
-                callback_data="help"
-            ),
-            InlineKeyboardButton(
-                "Aʙᴏᴜᴛ",
-                callback_data="about"
-            )
+            InlineKeyboardButton("Hᴇʟᴘ", callback_data="help"),
+            InlineKeyboardButton("Aʙᴏᴜᴛ", callback_data="about")
         ],
         [
-            InlineKeyboardButton(
-                "Jᴏɪɴ Gʀᴏᴜᴘ",
-                url=SEARCH_GROUP_LINK
-            )
+            InlineKeyboardButton("Jᴏɪɴ Gʀᴏᴜᴘ", url=SEARCH_GROUP_LINK)
         ],
         [
-            InlineKeyboardButton(
-                "Cʟᴏsᴇ",
-                callback_data="close"
-            )
+            InlineKeyboardButton("Cʟᴏsᴇ", callback_data="close")
         ]
     ]
 
