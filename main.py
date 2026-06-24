@@ -142,21 +142,47 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 # ================= CALLBACK =================
-elif data == "help":
 
-    await q.message.reply_text(
-        " Search movie name in group.\n"
-        " Click result button.\n"
-        " Bot sends file in PM."
-    )
+async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-elif data == "about":
+    q = update.callback_query
+    await q.answer()
 
-    await q.message.reply_text(
-        f"🤖 {BOT_USERNAME}\n"
-        "Auto Filter Bot"
-    )
+    data = q.data
 
+    if data == "help":
+
+        await q.message.reply_text(
+            "🔍 Search movie name in group\n"
+            "📥 Click result button\n"
+            "🤖 Bot sends file in PM"
+        )
+
+    elif data == "about":
+
+        await q.message.reply_text(
+            f"🤖 @{BOT_USERNAME}\n"
+            "Auto Filter Bot"
+        )
+
+    elif data == "close":
+
+        await q.message.delete()
+
+    elif data == "broadcast":
+
+        if q.from_user.id == ADMIN_ID:
+            broadcast_mode[q.from_user.id] = True
+            await q.message.reply_text(
+                "📢 Send broadcast message now..."
+            )
+
+    elif data == "status":
+
+        total = users.count_documents({})
+        await q.message.reply_text(
+            f"👥 Total Users: {total}"
+        )
 # ================= ADMIN =================
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -215,6 +241,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================= APP =================
+app = ApplicationBuilder().token(TOKEN).build()
+
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("admin", admin))
+
 app.add_handler(
     MessageHandler(
         filters.TEXT & ~filters.COMMAND,
