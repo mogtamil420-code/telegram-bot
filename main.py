@@ -142,54 +142,6 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 # ================= CALLBACK =================
-async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    q = update.callback_query
-    await q.answer()
-
-    data = q.data
-
-    if data.startswith("check_"):
-
-        movie_id = data.split("_")[1]
-
-        if not await is_joined(update, context):
-            await q.message.reply_text(
-                "Still not joined channel!"
-            )
-            return
-
-        movie = files.find_one({"movie_id": movie_id})
-
-        if movie:
-            await context.bot.send_document(
-                chat_id=q.from_user.id,
-                document=movie["file_id"],
-                caption=movie["caption"]
-            )
-
-    elif data == "status":
-
-        total = users.count_documents({})
-
-        await q.message.reply_text(
-            f"👥 Total Users: {total}"
-        )
-
-    elif data == "broadcast":
-
-        if q.from_user.id == ADMIN_ID:
-
-            broadcast_mode[q.from_user.id] = True
-
-            await q.message.reply_text(
-                "📢 Send broadcast message now..."
-            )
-
-    elif data == "close":
-
-        await q.message.delete()
-
 elif data == "help":
 
     await q.message.reply_text(
@@ -219,8 +171,6 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚙️ Admin Panel",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
-
-
 # ================= BROADCAST MESSAGE =================
 async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
