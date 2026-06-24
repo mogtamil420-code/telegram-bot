@@ -185,9 +185,12 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text
+
+    users_list = list(users.find())  # IMPORTANT FIX (preload)
+
     sent = 0
 
-    for u in users.find():
+    for u in users_list:
         try:
             await context.bot.send_message(
                 chat_id=u["user_id"],
@@ -200,7 +203,6 @@ async def handle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     broadcast_mode[user_id] = False
 
     await update.message.reply_text(f"📢 Sent to {sent} users")
-
 
 # ================= ADMIN CALLBACK =================
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -215,16 +217,13 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================= APP =================
-app = ApplicationBuilder().token(TOKEN).build()
-
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("admin", admin))
-
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 
 app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(CallbackQueryHandler(admin_callback))
 
+# ONLY ONE TEXT HANDLER
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
 print("BOT STARTED 🚀")
 app.run_polling()
