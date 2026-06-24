@@ -101,24 +101,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
 
-# ================= SEARCH =================
-async def search(update, context):
+async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # Only work in groups
     if update.effective_chat.type == "private":
+        return
 
-        buttons = [[
+    query = update.message.text
+
+    results = files.find({
+        "file_name": {"$regex": query, "$options": "i"}
+    }).limit(10)
+
+    buttons = []
+
+    for movie in results:
+
+        link = f"https://t.me/{BOT_USERNAME}?start={movie['movie_id']}"
+
+        buttons.append([
             InlineKeyboardButton(
-                "Jᴏɪɴ Gʀᴏᴜᴘ",
-                url=SEARCH_GROUP_LINK
+                movie["file_name"][:45],
+                url=link
             )
-        ]]
+        ])
 
-        await update.message.reply_text(
-            "Sᴏʀʀʏ Dᴜᴅᴇ!\n\n"
-            "I Cᴀɴ'ᴛ Wᴏʀᴋ Hᴇʀᴇ, Jᴜsᴛ Jᴏɪɴ ɪɴ ᴏᴜʀ Gʀᴏᴜᴘ Aɴᴅ Eɴᴊᴏʏ",
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+    if not buttons:
         return
 
     msg = await update.message.reply_text(
@@ -126,33 +133,62 @@ async def search(update, context):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    asyncio.create_task(auto_delete(context, msg.chat_id, msg.message_id))
-
-
+    asyncio.create_task(
+        auto_delete(
+            context,
+            msg.chat_id,
+            msg.message_id,
+            300
+        )
+    )
 # ================= CALLBACK =================
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     q = update.callback_query
     await q.answer()
 
     data = q.data
 
     if data.startswith("check_"):
+
         movie_id = data.split("_")[1]
 
         if not await is_joined(update, context):
-            await q.message.reply_text("Sᴛɪʟʟ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴄʜᴀɴɴᴇʟ!")
+            await q.message.reply_text(
+                "Still not joined channel!"
+            )
             return
 
-        await send_file(update, context, movie_id)
+        movie = files.find_one({"movie_id": movie_id})
 
+        if movie:
+            await context.bot.send_document(
+                chat_id=q.from_user.id,
+                document=movie["file_id"],
+                caption=movie["caption"]
+            )
 
-    elif data == "close":
-        await q.message.delete()
+    elif data == "status":
+
+        total = users.count_documents({})
+
+        await q.message.reply_text(
+            f"👥 Total Users: {total}"
+        )
 
     elif data == "broadcast":
+
         if q.from_user.id == ADMIN_ID:
+
             broadcast_mode[q.from_user.id] = True
-            await q.message.reply_text("📢 Send broadcast message now...")
+
+            await q.message.reply_text(
+                "📢 Send broadcast message now..."
+            )
+
+    elif data == "close":
+
+        await q.message.delete()
 
 
 # ================= ADMIN =================
@@ -216,16 +252,24 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= APP =================
 
-app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_broadcast
+    ),
+    group=0
+)
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("admin", admin))
+app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        search
+    ),
+    group=1
+)
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_broadcast))
-
-app.add_handler(CallbackQueryHandler(callback))
-app.add_handler(CallbackQueryHandler(admin_callback))
-
+app.add_handler(
+    CallbackQueryHandler(callback)
+)
 print("BOT STARTED 🚀")
 app.run_polling()
