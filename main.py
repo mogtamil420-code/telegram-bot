@@ -270,5 +270,6 @@ app.add_handler(
 app.add_handler(
     CallbackQueryHandler(callback)
 )
+
 print("BOT STARTED 🚀")
 app.run_polling()
