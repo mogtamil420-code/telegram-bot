@@ -63,10 +63,12 @@ async def send_file(update, context, movie_id):
 async def auto_delete(context, chat_id, message_id, seconds=900):
     await asyncio.sleep(seconds)
     try:
-        await context.bot.delete_message(chat_id, message_id)
-    except:
-        pass
-
+        await context.bot.delete_message(
+            chat_id=chat_id,
+            message_id=message_id
+        )
+    except Exception as e:
+        print("AUTO DELETE ERROR:", e)
 
 # ================= START =================
 
@@ -131,28 +133,45 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= CALLBACK =================
 
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     q = update.callback_query
     await q.answer()
-
     data = q.data
 
+    # JOIN CHECK
     if data.startswith("check_"):
         movie_id = data.split("_")[1]
 
         if not await is_joined(update, context):
-            await q.message.reply_text("❌ Sᴛɪʟʟ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴄʜᴀɴɴᴇʟ.")
+            await q.message.reply_text("❌ Sᴛɪʟʟ ɴᴏᴛ ᴊᴏɪɴᴇᴅ ᴄʜᴀɴɴᴇʟ!")
             return
 
-        await send_file(update, context, movie_id)
+        await send_file(update, context, movie_id, q.from_user.id)
 
+    # ADMIN BUTTONS
+    elif data == "status":
+        total = users.count_documents({})
+        await q.message.reply_text(f"👥 Total Users: {total}")
 
+    elif data == "broadcast":
+        broadcast_mode[q.from_user.id] = True
+        await q.message.reply_text("Send broadcast message now...")
+
+    elif data == "help":
+        await q.message.reply_text("Help menu coming soon")
+
+    elif data == "about":
+        await q.message.reply_text("About bot coming soon")
+
+    elif data == "close":
+        await q.message.delete()
 # ================= APP =================
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 app.add_handler(CallbackQueryHandler(callback))
 
-print("BOT STARTED 🚀")
-app.run_polling()
+if __name__ == "__main__":
+    print("BOT STARTED 🚀")
+    app.run_polling()
