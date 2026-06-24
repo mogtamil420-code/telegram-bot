@@ -245,15 +245,16 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "status":
         total = users.count_documents({})
-        await q.message.reply_text(f"👥 Total Users: {total}")
+        await q.message.reply_text(
+            f"👥 Total Users: {total}"
+        )
 
     elif data == "broadcast":
-
-    if q.from_user.id == ADMIN_ID:
-        broadcast_mode[q.from_user.id] = True
-        await q.message.reply_text(
-            "📢 Send broadcast message now"
-        )
+        if q.from_user.id == ADMIN_ID:
+            broadcast_mode[q.from_user.id] = True
+            await q.message.reply_text(
+                "📢 Send broadcast message now"
+            )
 
 # ================= APP =================
 app = ApplicationBuilder().token(TOKEN).build()
@@ -278,6 +279,7 @@ app.add_handler(
 )
 
 app.add_handler(CallbackQueryHandler(callback))
+app.add_handler(CallbackQueryHandler(admin_callback))
 
 print("BOT STARTED 🚀")
 app.run_polling()
