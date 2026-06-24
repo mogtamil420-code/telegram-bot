@@ -1,4 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from config import HELP_IMAGE
 
 async def help_menu(update, context):
 
