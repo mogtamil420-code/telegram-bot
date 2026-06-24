@@ -142,7 +142,6 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 # ================= CALLBACK =================
-
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     q = update.callback_query
@@ -150,12 +149,22 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = q.data
 
-    if data == "help":
+    if data.startswith("check_"):
+
+        movie_id = data.split("_")[1]
+
+        if not await is_joined(update, context):
+            await q.message.reply_text("❌ Join channel first")
+            return
+
+        await send_file(update, context, movie_id)
+
+    elif data == "help":
 
         await q.message.reply_text(
-            "🔍 Search movie name in group\n"
-            "📥 Click result button\n"
-            "🤖 Bot sends file in PM"
+            " Search movie name in group\n"
+            " Click result button\n"
+            " Bot sends file in PM"
         )
 
     elif data == "about":
@@ -174,15 +183,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if q.from_user.id == ADMIN_ID:
             broadcast_mode[q.from_user.id] = True
             await q.message.reply_text(
-                "📢 Send broadcast message now..."
+                "📢 Send broadcast message now"
             )
-
-    elif data == "status":
-
-        total = users.count_documents({})
-        await q.message.reply_text(
-            f"👥 Total Users: {total}"
-        )
 # ================= ADMIN =================
 async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -262,9 +264,8 @@ app.add_handler(
     group=1
 )
 
-app.add_handler(
-    CallbackQueryHandler(callback)
-)
+app.add_handler(CallbackQueryHandler(callback))
+app.add_handler(CallbackQueryHandler(admin_callback))
 
 print("BOT STARTED 🚀")
 app.run_polling()
