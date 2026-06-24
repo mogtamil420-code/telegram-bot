@@ -107,6 +107,9 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     query = update.message.text
+    
+    if len(query) < 3:
+    return
 
     results = files.find({
         "file_name": {"$regex": query, "$options": "i"}
@@ -129,10 +132,13 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = await update.message.reply_text(
-        "🎬 Results:",
-        reply_markup=InlineKeyboardMarkup(buttons)
-    )
-
+    f" Tʜᴇ Rᴇsᴜʟᴛs Fᴏʀ ☞ {query}\n\n"
+    f" Fᴏᴜɴᴅ ☞ {len(buttons)} Rᴇsᴜʟᴛs\n\n"
+    f" Rᴇǫᴜᴇsᴛᴇᴅ Bʏ ☞ {update.effective_user.mention_html()}\n\n"
+    f" Pᴏᴡᴇʀᴇᴅ Bʏ ☞ @{BOT_USERNAME}",
+    parse_mode="HTML",
+    reply_markup=InlineKeyboardMarkup(buttons)
+)
     asyncio.create_task(
         auto_delete(
             context,
@@ -241,6 +247,13 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = users.count_documents({})
         await q.message.reply_text(f"👥 Total Users: {total}")
 
+    elif data == "broadcast":
+
+    if q.from_user.id == ADMIN_ID:
+        broadcast_mode[q.from_user.id] = True
+        await q.message.reply_text(
+            "📢 Send broadcast message now"
+        )
 
 # ================= APP =================
 app = ApplicationBuilder().token(TOKEN).build()
@@ -265,7 +278,6 @@ app.add_handler(
 )
 
 app.add_handler(CallbackQueryHandler(callback))
-app.add_handler(CallbackQueryHandler(admin_callback))
 
 print("BOT STARTED 🚀")
 app.run_polling()
