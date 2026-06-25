@@ -106,7 +106,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
         return
 
-    query = update.message.text
+    await query.message.edit_caption(...)
     
     if len(query) < 3:
         return
@@ -131,7 +131,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not buttons:
         return
 
-    msg = await update.message.reply_text(
+    msg = await query.message.edit_caption(...)
     f" Tʜᴇ Rᴇsᴜʟᴛs Fᴏʀ ☞ {query}\n\n"
     f" Fᴏᴜɴᴅ ☞ {len(buttons)} Rᴇsᴜʟᴛs\n\n"
     f" Rᴇǫᴜᴇsᴛᴇᴅ Bʏ ☞ {update.effective_user.mention_html()}\n\n"
